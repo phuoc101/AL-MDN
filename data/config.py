@@ -34,6 +34,27 @@ voc300_active = {
     'name': 'VOC',
 }
 
+
+# SSD300 CONFIGS for CUSTOM VOC (active learning)
+voc300_active_custom = {
+    'num_classes': 21,
+    'lr_steps': (800, 1000, 1200),
+    'max_iter': 1200,
+    'feature_maps': [38, 19, 10, 5, 3, 1],
+    'min_dim': 300,
+    'steps': [8, 16, 32, 64, 100, 300],
+    'min_sizes': [30, 60, 111, 162, 213, 264],
+    'max_sizes': [60, 111, 162, 213, 264, 315],
+    'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+    'variance': [0.1, 0.2],
+    'clip': True,
+    'num_initial_labeled_set': 200,
+    'num_total_images': 5011,
+    'acquisition_budget': 100,
+    'num_cycles': 1,
+    'name': 'VOC',
+}
+
 # SSD300 CONFIGS for COCO (active learning)
 coco300_active = {
     'num_classes': 81,

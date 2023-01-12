@@ -36,8 +36,8 @@ def active_learning_cycle(
     """Active learning cycle for Mixture Density Networks.
 
     Collect aleatoric and epistemic uncertainties of both tasks (localization and classification)
-    and normalize each uncertainty values using z-score for having similar scale. Afte that,
-    the maximum value among the four uncertaintiesc will be the final score for the current image.
+    and normalize each uncertainty values using z-score for having similar scale. After that,
+    the maximum value among the four uncertainties will be the final score for the current image.
     """
     # lists of aleatoric and epistemic uncertainties of localization
     list_loc_al = []
@@ -47,18 +47,41 @@ def active_learning_cycle(
     list_conf_ep = []
 
     # filtering threshold of confidence score
-    thresh = 0.5
+    thresh = 0.2
     checker = 0
     for j in range(len(batch_iterator)):
-        print(j)
+        # print(j)
         images, _ = next(batch_iterator)
         images = images.cuda()
 
         out = net(images)
-        priors, loc, loc_var, loc_pi, loc_2, loc_var_2, loc_pi_2, \
-        loc_3, loc_var_3, loc_pi_3, loc_4, loc_var_4, loc_pi_4, \
-        conf, conf_var, conf_pi, conf_2, conf_var_2, conf_pi_2, \
-        conf_3, conf_var_3, conf_pi_3, conf_4, conf_var_4, conf_pi_4 = out
+        (
+            priors,
+            loc,
+            loc_var,
+            loc_pi,
+            loc_2,
+            loc_var_2,
+            loc_pi_2,
+            loc_3,
+            loc_var_3,
+            loc_pi_3,
+            loc_4,
+            loc_var_4,
+            loc_pi_4,
+            conf,
+            conf_var,
+            conf_pi,
+            conf_2,
+            conf_var_2,
+            conf_pi_2,
+            conf_3,
+            conf_var_3,
+            conf_pi_3,
+            conf_4,
+            conf_var_4,
+            conf_pi_4,
+        ) = out
 
         # confidence score of classification
         # use a softmax function to make valus in probability space
@@ -79,12 +102,7 @@ def active_learning_cycle(
         conf_var_4 = torch.sigmoid(conf_var_4)
 
         # use a softmax function to keep pi in probability space and split mixture weights
-        (
-            conf_pi,
-            conf_pi_2,
-            conf_pi_3,
-            conf_pi_4
-        ) = stack_softamx_unbind(
+        (conf_pi, conf_pi_2, conf_pi_3, conf_pi_4) = stack_softamx_unbind(
             pi=conf_p_pi,
             pi_2=conf_p_2_pi,
             pi_3=conf_p_3_pi,
@@ -96,21 +114,37 @@ def active_learning_cycle(
         conf_pi_4 = conf_pi_4.view(conf.size(0), -1, 1)
 
         # classification score
-        new_conf = conf_pi*conf + conf_pi_2*conf_2 + conf_pi_3*conf_3 + conf_pi_4*conf_4
+        new_conf = (
+            conf_pi * conf
+            + conf_pi_2 * conf_2
+            + conf_pi_3 * conf_3
+            + conf_pi_4 * conf_4
+        )
 
         # aleatoric uncertainty of classification
-        cls_al_uc = conf_pi*conf_var + conf_pi_2*conf_var_2 + conf_pi_3*conf_var_3 + conf_pi_4*conf_var_4
+        cls_al_uc = (
+            conf_pi * conf_var
+            + conf_pi_2 * conf_var_2
+            + conf_pi_3 * conf_var_3
+            + conf_pi_4 * conf_var_4
+        )
 
         # epistemic uncertainty of classification
         cls_ep_uc = (
-            conf_pi*(conf-new_conf)**2 +
-            conf_pi_2*(conf_2-new_conf)**2 +
-            conf_pi_3*(conf_3-new_conf)**2 +
-            conf_pi_4*(conf_4-new_conf)**2
+            conf_pi * (conf - new_conf) ** 2
+            + conf_pi_2 * (conf_2 - new_conf) ** 2
+            + conf_pi_3 * (conf_3 - new_conf) ** 2
+            + conf_pi_4 * (conf_4 - new_conf) ** 2
         )
-        new_conf = new_conf.view(loc.size(0), priors.size(0), num_classes).transpose(2, 1)
-        cls_al_uc = cls_al_uc.view(loc.size(0), priors.size(0), num_classes).transpose(2, 1)
-        cls_ep_uc = cls_ep_uc.view(loc.size(0), priors.size(0), num_classes).transpose(2, 1)
+        new_conf = new_conf.view(loc.size(0), priors.size(0), num_classes).transpose(
+            2, 1
+        )
+        cls_al_uc = cls_al_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
+            2, 1
+        )
+        cls_ep_uc = cls_ep_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
+            2, 1
+        )
 
         # aleatoric uncertainty of localizaiton
         # use a sigmoid function to satisfy the positiveness constraint
@@ -126,12 +160,7 @@ def active_learning_cycle(
         loc_p_4_pi = loc_pi_4.view(-1, 4)
 
         # use a softmax function to keep pi in probability space and split mixture weights
-        (
-            pi_1_after,
-            pi_2_after,
-            pi_3_after,
-            pi_4_after
-        ) = stack_softamx_unbind(
+        (pi_1_after, pi_2_after, pi_3_after, pi_4_after) = stack_softamx_unbind(
             pi=loc_p_pi,
             pi_2=loc_p_2_pi,
             pi_3=loc_p_3_pi,
@@ -144,22 +173,27 @@ def active_learning_cycle(
         pi_4_after = pi_4_after.view(loc.size(0), -1, 4)
 
         # localization coordinates
-        new_loc = pi_1_after*loc + pi_2_after*loc_2 + pi_3_after*loc_3 + pi_4_after*loc_4
+        new_loc = (
+            pi_1_after * loc
+            + pi_2_after * loc_2
+            + pi_3_after * loc_3
+            + pi_4_after * loc_4
+        )
 
         # aleatoric uncertainty of localization
         al_uc = (
-            pi_1_after*loc_var +
-            pi_2_after*loc_var_2 +
-            pi_3_after*loc_var_3 +
-            pi_4_after*loc_var_4
+            pi_1_after * loc_var
+            + pi_2_after * loc_var_2
+            + pi_3_after * loc_var_3
+            + pi_4_after * loc_var_4
         )
 
         # epistemic uncertainty of localization
         ep_uc = (
-            pi_1_after*(loc-new_loc)**2 +
-            pi_2_after*(loc_2-new_loc)**2 +
-            pi_3_after*(loc_3-new_loc)**2 +
-            pi_4_after*(loc_4-new_loc)**2
+            pi_1_after * (loc - new_loc) ** 2
+            + pi_2_after * (loc_2 - new_loc) ** 2
+            + pi_3_after * (loc_3 - new_loc) ** 2
+            + pi_4_after * (loc_4 - new_loc) ** 2
         )
 
         num = loc.size(0)
@@ -197,12 +231,13 @@ def active_learning_cycle(
                         loc_al_uc[ids[:count]],
                         loc_ep_uc[ids[:count]],
                         conf_al[ids[:count]].unsqueeze(1),
-                        conf_ep[ids[:count]].unsqueeze(1)
+                        conf_ep[ids[:count]].unsqueeze(1),
                     ),
-                    1
+                    1,
                 )
 
         # store the maximum value of each uncertainty in each jagged list
+        print(f"Image {j}:")
         for p in range(output.size(1)):
             q = 0
             if j == checker:
@@ -221,9 +256,20 @@ def active_learning_cycle(
                 list_conf_al[j].append(UC_max_conf_al_temp)
                 list_conf_ep[j].append(UC_max_conf_ep_temp)
                 q += 1
+                print(
+                    f"Uncertainty: max_al: {UC_max_al_temp}, ",
+                    f"max_conf_al: {UC_max_conf_al_temp} ",
+                    f"max_ep: {UC_max_ep_temp}, ",
+                    f"max_conf_ep: {UC_max_conf_ep_temp}",
+                )
+        print("==========")
+    # print(f"List loc_al: {list_loc_al}")
+    # print(f"List conf_al: {list_conf_al}")
+    # print(f"List loc_ep: {list_loc_ep}")
+    # print(f"List conf_al: {list_conf_ep}")
 
     # z-score normalization and the deciding labeled and unlabeled dataset
-    labeled_set, unlabeled_set = normalization_and_select_dataset(
+    labeled_set, unlabeled_set, to_label_set = normalization_and_select_dataset(
         labeled_set=labeled_set,
         unlabeled_set=unlabeled_set,
         list_loc_al=list_loc_al,
@@ -234,7 +280,7 @@ def active_learning_cycle(
         num_total_images=num_total_images,
     )
 
-    return labeled_set, unlabeled_set
+    return labeled_set, unlabeled_set, to_label_set
 
 
 def stack_softamx_unbind(
@@ -246,12 +292,7 @@ def stack_softamx_unbind(
     """Softmax and split mixture weights (pi)."""
     pi_all = torch.stack([pi, pi_2, pi_3, pi_4])
     pi_all = torch.softmax(pi_all, dim=0)
-    (
-        pi,
-        pi_2,
-        pi_3,
-        pi_4
-    ) = torch.unbind(pi_all, dim=0)
+    (pi, pi_2, pi_3, pi_4) = torch.unbind(pi_all, dim=0)
 
     return pi, pi_2, pi_3, pi_4
 
@@ -300,28 +341,42 @@ def normalization_and_select_dataset(
         uncertainties[i] = [max(val) for val in uncertainty]
 
     # z-score normalization
-    uncertainties[0] = [(val-mean_loc_al)/stdev_loc_al for val in uncertainties[0]]
-    uncertainties[1] = [(val-mean_loc_ep)/stdev_loc_ep for val in uncertainties[1]]
-    uncertainties[2] = [(val-mean_conf_al)/stdev_conf_al for val in uncertainties[2]]
-    uncertainties[3] = [(val-mean_conf_ep)/stdev_conf_ep for val in uncertainties[3]]
+    uncertainties[0] = [(val - mean_loc_al) / stdev_loc_al for val in uncertainties[0]]
+    uncertainties[1] = [(val - mean_loc_ep) / stdev_loc_ep for val in uncertainties[1]]
+    uncertainties[2] = [
+        (val - mean_conf_al) / stdev_conf_al for val in uncertainties[2]
+    ]
+    uncertainties[3] = [
+        (val - mean_conf_ep) / stdev_conf_ep for val in uncertainties[3]
+    ]
 
     # make the minimum value converted by z-score normalization to the original minimum value
     # need this part because we need to calculate the maximum of the total 4 uncertainties
-    for _ in range(uncertainties[0].count((uc_min-mean_loc_al)/stdev_loc_al)):
-        uncertainties[0][uncertainties[0].index((uc_min-mean_loc_al)/stdev_loc_al)] = uc_min
-    for _ in range(uncertainties[1].count((uc_min-mean_loc_ep)/stdev_loc_ep)):
-        uncertainties[1][uncertainties[1].index((uc_min-mean_loc_ep)/stdev_loc_ep)] = uc_min
-    for _ in range(uncertainties[2].count((uc_min-mean_conf_al)/stdev_conf_al)):
-        uncertainties[2][uncertainties[2].index((uc_min-mean_conf_al)/stdev_conf_al)] = uc_min
-    for _ in range(uncertainties[3].count((uc_min-mean_conf_ep)/stdev_conf_ep)):
-        uncertainties[3][uncertainties[3].index((uc_min-mean_conf_ep)/stdev_conf_ep)] = uc_min
+    for _ in range(uncertainties[0].count((uc_min - mean_loc_al) / stdev_loc_al)):
+        uncertainties[0][
+            uncertainties[0].index((uc_min - mean_loc_al) / stdev_loc_al)
+        ] = uc_min
+    for _ in range(uncertainties[1].count((uc_min - mean_loc_ep) / stdev_loc_ep)):
+        uncertainties[1][
+            uncertainties[1].index((uc_min - mean_loc_ep) / stdev_loc_ep)
+        ] = uc_min
+    for _ in range(uncertainties[2].count((uc_min - mean_conf_al) / stdev_conf_al)):
+        uncertainties[2][
+            uncertainties[2].index((uc_min - mean_conf_al) / stdev_conf_al)
+        ] = uc_min
+    for _ in range(uncertainties[3].count((uc_min - mean_conf_ep) / stdev_conf_ep)):
+        uncertainties[3][
+            uncertainties[3].index((uc_min - mean_conf_ep) / stdev_conf_ep)
+        ] = uc_min
 
     uncertainties = torch.FloatTensor(uncertainties)
-    uc_list = torch.stack([uncertainties[0], uncertainties[1], uncertainties[2], uncertainties[3]], dim=1)
+    uc_list = torch.stack(
+        [uncertainties[0], uncertainties[1], uncertainties[2], uncertainties[3]], dim=1
+    )
     uc_list = np.array(uc_list)
     criterion_UC = np.max(uc_list, axis=1)
     sorted_indices = np.argsort(criterion_UC)[::-1]
-
+    to_label_set = list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     labeled_set += list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     unlabeled_set = list(np.array(unlabeled_set)[sorted_indices[acquisition_budget:]])
 
@@ -329,4 +384,4 @@ def normalization_and_select_dataset(
     assert len(list(set(labeled_set) | set(unlabeled_set))) == num_total_images
     assert len(list(set(labeled_set) & set(unlabeled_set))) == 0
 
-    return labeled_set, unlabeled_set
+    return labeled_set, unlabeled_set, to_label_set
