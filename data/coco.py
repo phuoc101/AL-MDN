@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 import cv2
 import numpy as np
 
-COCO_ROOT = '../tmp/coco/'
+COCO_ROOT = osp.join(osp.dirname(osp.abspath(__file__)), './datasets/coco')
 IMAGES = 'images'
 ANNOTATIONS = 'annotations'
 COCO_API = 'PythonAPI'
@@ -85,7 +85,7 @@ class COCODetection(data.Dataset):
         in the target (bbox) and transforms it.
     """
 
-    def __init__(self, root, image_set='train2014', transform=None,
+    def __init__(self, root, image_set='train2017', transform=None,
                  target_transform=COCOAnnotationTransform(), dataset_name='MS COCO'):
         sys.path.append(osp.join(root, COCO_API))
         from pycocotools.coco import COCO

@@ -215,6 +215,10 @@ def nms(boxes, scores, overlap=0.5, top_k=200):
             break
         idx = idx[:-1]  # remove kept element from view
         # load bboxes of next highest vals
+        xx1 = xx1.resize_(0)
+        xx2 = xx2.resize_(0)
+        yy1 = yy1.resize_(0)
+        yy2 = yy2.resize_(0)
         torch.index_select(x1, 0, idx, out=xx1)
         torch.index_select(y1, 0, idx, out=yy1)
         torch.index_select(x2, 0, idx, out=xx2)

@@ -38,7 +38,7 @@ class SSD_GMM(nn.Module):
         super(SSD_GMM, self).__init__()
         self.phase = phase
         self.num_classes = num_classes
-        if(size==300):
+        if size == 300:
             self.cfg = (coco, voc300)[num_classes == 21]
         else:
             self.cfg = (coco, voc512)[num_classes == 21]
@@ -81,9 +81,9 @@ class SSD_GMM(nn.Module):
         self.conf_var_4 = nn.ModuleList(head[22])
         self.conf_pi_4 = nn.ModuleList(head[23])
 
-        if phase == 'test':
+        if phase == "test":
             self.softmax = nn.Softmax(dim=-1)
-            self.detect = Detect_GMM(num_classes, 0, 200, 0.01, 0.45)
+            # self.detect = Detect_GMM(num_classes, 0, 200, 0.01, 0.45)
 
     def forward(self, x):
         """Applies network layers and ops on input image(s) x.
@@ -149,12 +149,59 @@ class SSD_GMM(nn.Module):
                 sources.append(x)
 
         # apply multibox head to source layers
-        for (x, l_mu_1, l_var_1, l_pi_1, l_mu_2, l_var_2, l_pi_2, l_mu_3, l_var_3, l_pi_3, l_mu_4, l_var_4, l_pi_4, \
-        c_mu_1, c_var_1, c_pi_1, c_mu_2, c_var_2, c_pi_2, c_mu_3, c_var_3, c_pi_3, c_mu_4, c_var_4, c_pi_4) in zip(sources, \
-        self.loc_mu_1, self.loc_var_1, self.loc_pi_1, self.loc_mu_2, self.loc_var_2, self.loc_pi_2, \
-        self.loc_mu_3, self.loc_var_3, self.loc_pi_3, self.loc_mu_4, self.loc_var_4, self.loc_pi_4, \
-        self.conf_mu_1, self.conf_var_1, self.conf_pi_1, self.conf_mu_2, self.conf_var_2, self.conf_pi_2, \
-        self.conf_mu_3, self.conf_var_3, self.conf_pi_3, self.conf_mu_4, self.conf_var_4, self.conf_pi_4):
+        for (
+            x,
+            l_mu_1,
+            l_var_1,
+            l_pi_1,
+            l_mu_2,
+            l_var_2,
+            l_pi_2,
+            l_mu_3,
+            l_var_3,
+            l_pi_3,
+            l_mu_4,
+            l_var_4,
+            l_pi_4,
+            c_mu_1,
+            c_var_1,
+            c_pi_1,
+            c_mu_2,
+            c_var_2,
+            c_pi_2,
+            c_mu_3,
+            c_var_3,
+            c_pi_3,
+            c_mu_4,
+            c_var_4,
+            c_pi_4,
+        ) in zip(
+            sources,
+            self.loc_mu_1,
+            self.loc_var_1,
+            self.loc_pi_1,
+            self.loc_mu_2,
+            self.loc_var_2,
+            self.loc_pi_2,
+            self.loc_mu_3,
+            self.loc_var_3,
+            self.loc_pi_3,
+            self.loc_mu_4,
+            self.loc_var_4,
+            self.loc_pi_4,
+            self.conf_mu_1,
+            self.conf_var_1,
+            self.conf_pi_1,
+            self.conf_mu_2,
+            self.conf_var_2,
+            self.conf_pi_2,
+            self.conf_mu_3,
+            self.conf_var_3,
+            self.conf_pi_3,
+            self.conf_mu_4,
+            self.conf_var_4,
+            self.conf_pi_4,
+        ):
             loc_mu_1.append(l_mu_1(x).permute(0, 2, 3, 1).contiguous())
             loc_var_1.append(l_var_1(x).permute(0, 2, 3, 1).contiguous())
             loc_pi_1.append(l_pi_1(x).permute(0, 2, 3, 1).contiguous())
@@ -221,17 +268,14 @@ class SSD_GMM(nn.Module):
                     loc_pi_1.reshape(-1),
                     loc_pi_2.reshape(-1),
                     loc_pi_3.reshape(-1),
-                    loc_pi_4.reshape(-1)
+                    loc_pi_4.reshape(-1),
                 ]
             )
-            pi_all = pi_all.transpose(0,1)
-            pi_all = (torch.softmax(pi_all, dim=1)).transpose(0,1).reshape(-1)
-            (
-                loc_pi_1,
-                loc_pi_2,
-                loc_pi_3,
-                loc_pi_4
-            ) = torch.split(pi_all, loc_pi_1.reshape(-1).size(0), dim=0)
+            pi_all = pi_all.transpose(0, 1)
+            pi_all = (torch.softmax(pi_all, dim=1)).transpose(0, 1).reshape(-1)
+            (loc_pi_1, loc_pi_2, loc_pi_3, loc_pi_4) = torch.split(
+                pi_all, loc_pi_1.reshape(-1).size(0), dim=0
+            )
             loc_pi_1 = loc_pi_1.view(-1, 4)
             loc_pi_2 = loc_pi_2.view(-1, 4)
             loc_pi_3 = loc_pi_3.view(-1, 4)
@@ -252,23 +296,27 @@ class SSD_GMM(nn.Module):
                     conf_pi_1.reshape(-1),
                     conf_pi_2.reshape(-1),
                     conf_pi_3.reshape(-1),
-                    conf_pi_4.reshape(-1)
+                    conf_pi_4.reshape(-1),
                 ]
             )
-            conf_pi_all = conf_pi_all.transpose(0,1)
-            conf_pi_all = (torch.softmax(conf_pi_all, dim=1)).transpose(0,1).reshape(-1)
-            (
-                conf_pi_1,
-                conf_pi_2,
-                conf_pi_3,
-                conf_pi_4
-            ) = torch.split(conf_pi_all, conf_pi_1.reshape(-1).size(0), dim=0)
+            conf_pi_all = conf_pi_all.transpose(0, 1)
+            conf_pi_all = (
+                (torch.softmax(conf_pi_all, dim=1)).transpose(0, 1).reshape(-1)
+            )
+            (conf_pi_1, conf_pi_2, conf_pi_3, conf_pi_4) = torch.split(
+                conf_pi_all, conf_pi_1.reshape(-1).size(0), dim=0
+            )
             conf_pi_1 = conf_pi_1.view(-1, 1)
             conf_pi_2 = conf_pi_2.view(-1, 1)
             conf_pi_3 = conf_pi_3.view(-1, 1)
             conf_pi_4 = conf_pi_4.view(-1, 1)
 
-            output = self.detect(
+            output = Detect_GMM.apply(
+                self.num_classes,
+                0,
+                200,
+                0.01,
+                0.45,
                 self.priors.type(type(x.data)),
                 loc_mu_1.view(loc_mu_1.size(0), -1, 4),
                 loc_var_1.view(loc_var_1.size(0), -1, 4),
@@ -293,7 +341,7 @@ class SSD_GMM(nn.Module):
                 conf_pi_3.view(conf_var_3.size(0), -1, 1),
                 self.softmax(conf_mu_4.view(conf_mu_4.size(0), -1, self.num_classes)),
                 conf_var_4.view(conf_var_4.size(0), -1, self.num_classes),
-                conf_pi_4.view(conf_var_4.size(0), -1, 1)
+                conf_pi_4.view(conf_var_4.size(0), -1, 1),
             )
 
         else:
@@ -322,19 +370,20 @@ class SSD_GMM(nn.Module):
                 conf_pi_3.view(conf_pi_3.size(0), -1, 1),
                 conf_mu_4.view(conf_mu_4.size(0), -1, self.num_classes),
                 conf_var_4.view(conf_var_4.size(0), -1, self.num_classes),
-                conf_pi_4.view(conf_pi_4.size(0), -1, 1)
+                conf_pi_4.view(conf_pi_4.size(0), -1, 1),
             )
         return output
 
     def load_weights(self, base_file):
         other, ext = os.path.splitext(base_file)
-        if ext == '.pkl' or '.pth':
-            print('Loading weights into state dict...')
-            self.load_state_dict(torch.load(base_file,
-                                 map_location=lambda storage, loc: storage))
-            print('Finished!')
+        if ext == ".pkl" or ".pth":
+            print("Loading weights into state dict...")
+            self.load_state_dict(
+                torch.load(base_file, map_location=lambda storage, loc: storage)
+            )
+            print("Finished!")
         else:
-            print('Sorry only .pth and .pkl files supported.')
+            print("Sorry only .pth and .pkl files supported.")
 
 
 # This function is derived from torchvision VGG make_layers()
@@ -343,9 +392,9 @@ def vgg(cfg, i, batch_norm=False):
     layers = []
     in_channels = i
     for v in cfg:
-        if v == 'M':
+        if v == "M":
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-        elif v == 'C':
+        elif v == "C":
             layers += [nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)]
         else:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -357,8 +406,7 @@ def vgg(cfg, i, batch_norm=False):
     pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
     conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)
     conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
-    layers += [pool5, conv6,
-               nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
+    layers += [pool5, conv6, nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
     return layers
 
 
@@ -368,13 +416,21 @@ def add_extras(cfg, i, batch_norm=False):
     in_channels = i
     flag = False
     for k, v in enumerate(cfg):
-        if in_channels != 'S':
-            if v == 'S':
-                layers += [nn.Conv2d(in_channels, cfg[k + 1],
-                           kernel_size=(1, 3)[flag], stride=2, padding=1)]
-            elif v=='K':
-                layers += [nn.Conv2d(in_channels, 256,
-                           kernel_size=4, stride=1, padding=1)]
+        if in_channels != "S":
+            if v == "S":
+                layers += [
+                    nn.Conv2d(
+                        in_channels,
+                        cfg[k + 1],
+                        kernel_size=(1, 3)[flag],
+                        stride=2,
+                        padding=1,
+                    )
+                ]
+            elif v == "K":
+                layers += [
+                    nn.Conv2d(in_channels, 256, kernel_size=4, stride=1, padding=1)
+                ]
             else:
                 layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
             flag = not flag
@@ -410,78 +466,248 @@ def multibox(vgg, extra_layers, cfg, num_classes):
     conf_pi_4_layers = []
 
     for k, v in enumerate(vgg_source):
-        loc_mu_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_var_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_pi_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_mu_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_var_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_pi_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_mu_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_var_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_pi_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_mu_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_var_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_pi_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        conf_mu_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_1_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_2_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_3_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_4_layers += [nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
+        loc_mu_1_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_1_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_1_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_2_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_2_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_2_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_3_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_3_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_3_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_4_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_4_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_4_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        conf_mu_1_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_var_1_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_pi_1_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_2_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_var_2_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_pi_2_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_3_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_var_3_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_pi_3_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_4_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_var_4_layers += [
+            nn.Conv2d(
+                vgg[v].out_channels, cfg[k] * num_classes, kernel_size=3, padding=1
+            )
+        ]
+        conf_pi_4_layers += [
+            nn.Conv2d(vgg[v].out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
 
     for k, v in enumerate(extra_layers[1::2], 2):
-        loc_mu_1_layers += [nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)]
-        loc_var_1_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_pi_1_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_mu_2_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_var_2_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_pi_2_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_mu_3_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_var_3_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_pi_3_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_mu_4_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_var_4_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        loc_pi_4_layers += [nn.Conv2d(v.out_channels, cfg[k]* 4, kernel_size=3, padding=1)]
-        conf_mu_1_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_1_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_1_layers += [nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_2_layers += [nn.Conv2d(v.out_channels,  cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_2_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_2_layers += [nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_3_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_3_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_3_layers += [nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
-        conf_mu_4_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_var_4_layers += [nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)]
-        conf_pi_4_layers += [nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)]
+        loc_mu_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_mu_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_var_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        loc_pi_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 4, kernel_size=3, padding=1)
+        ]
+        conf_mu_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_var_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_pi_1_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_var_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_pi_2_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_var_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_pi_3_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
+        conf_mu_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_var_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * num_classes, kernel_size=3, padding=1)
+        ]
+        conf_pi_4_layers += [
+            nn.Conv2d(v.out_channels, cfg[k] * 1, kernel_size=3, padding=1)
+        ]
 
-    return vgg, extra_layers, (
-        loc_mu_1_layers, loc_var_1_layers, loc_pi_1_layers, loc_mu_2_layers, loc_var_2_layers, loc_pi_2_layers, \
-        loc_mu_3_layers, loc_var_3_layers, loc_pi_3_layers, loc_mu_4_layers, loc_var_4_layers, loc_pi_4_layers, \
-        conf_mu_1_layers, conf_var_1_layers, conf_pi_1_layers, conf_mu_2_layers, conf_var_2_layers, conf_pi_2_layers, \
-        conf_mu_3_layers, conf_var_3_layers, conf_pi_3_layers, conf_mu_4_layers, conf_var_4_layers, conf_pi_4_layers
+    return (
+        vgg,
+        extra_layers,
+        (
+            loc_mu_1_layers,
+            loc_var_1_layers,
+            loc_pi_1_layers,
+            loc_mu_2_layers,
+            loc_var_2_layers,
+            loc_pi_2_layers,
+            loc_mu_3_layers,
+            loc_var_3_layers,
+            loc_pi_3_layers,
+            loc_mu_4_layers,
+            loc_var_4_layers,
+            loc_pi_4_layers,
+            conf_mu_1_layers,
+            conf_var_1_layers,
+            conf_pi_1_layers,
+            conf_mu_2_layers,
+            conf_var_2_layers,
+            conf_pi_2_layers,
+            conf_mu_3_layers,
+            conf_var_3_layers,
+            conf_pi_3_layers,
+            conf_mu_4_layers,
+            conf_var_4_layers,
+            conf_pi_4_layers,
+        ),
     )
 
 
 base = {
-    '300': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'C', 512, 512, 512, 'M',
-            512, 512, 512],
-    '512': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M',
-            512, 512, 512],
+    "300": [
+        64,
+        64,
+        "M",
+        128,
+        128,
+        "M",
+        256,
+        256,
+        256,
+        "C",
+        512,
+        512,
+        512,
+        "M",
+        512,
+        512,
+        512,
+    ],
+    "512": [
+        64,
+        64,
+        "M",
+        128,
+        128,
+        "M",
+        256,
+        256,
+        256,
+        "M",
+        512,
+        512,
+        512,
+        "M",
+        512,
+        512,
+        512,
+    ],
 }
 extras = {
-    '300': [256, 'S', 512, 128, 'S', 256, 128, 256, 128, 256],
-    '512': [256, 'S', 512, 128, 'S', 256, 128, 'S', 256, 128, 'S', 256, 128, 'K'],
+    "300": [256, "S", 512, 128, "S", 256, 128, 256, 128, 256],
+    "512": [256, "S", 512, 128, "S", 256, 128, "S", 256, 128, "S", 256, 128, "K"],
 }
 mbox = {
-    '300': [4, 6, 6, 6, 4, 4],  # number of boxes per feature map location
-    '512': [4, 6, 6, 6, 6, 4, 4],
+    "300": [4, 6, 6, 6, 4, 4],  # number of boxes per feature map location
+    "512": [4, 6, 6, 6, 6, 4, 4],
 }
 
 
@@ -490,8 +716,11 @@ def build_ssd_gmm(phase, size=300, num_classes=21):
         print("ERROR: Phase: " + phase + " not recognized")
         return
 
-    base_, extras_, head_ = multibox(vgg(base[str(size)], 3),
-                                     add_extras(extras[str(size)], 1024),
-                                     mbox[str(size)], num_classes)
+    base_, extras_, head_ = multibox(
+        vgg(base[str(size)], 3),
+        add_extras(extras[str(size)], 1024),
+        mbox[str(size)],
+        num_classes,
+    )
 
     return SSD_GMM(phase, size, base_, extras_, head_, num_classes)
