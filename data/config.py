@@ -48,7 +48,7 @@ voc300_active_custom = {
     'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
     'variance': [0.1, 0.2],
     'clip': True,
-    'num_initial_labeled_set': 200,
+    'num_initial_labeled_set': 500,
     'num_total_images': 5011,
     'acquisition_budget': 100,
     'num_cycles': 1,

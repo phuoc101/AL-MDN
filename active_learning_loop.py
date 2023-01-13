@@ -47,10 +47,9 @@ def active_learning_cycle(
     list_conf_ep = []
 
     # filtering threshold of confidence score
-    thresh = 0.2
+    thresh = 0.15
     checker = 0
-    for j in range(len(batch_iterator)):
-        # print(j)
+    for j in range(int(len(batch_iterator))):
         images, _ = next(batch_iterator)
         images = images.cuda()
 
@@ -263,10 +262,6 @@ def active_learning_cycle(
                     f"max_conf_ep: {UC_max_conf_ep_temp}",
                 )
         print("==========")
-    # print(f"List loc_al: {list_loc_al}")
-    # print(f"List conf_al: {list_conf_al}")
-    # print(f"List loc_ep: {list_loc_ep}")
-    # print(f"List conf_al: {list_conf_ep}")
 
     # z-score normalization and the deciding labeled and unlabeled dataset
     labeled_set, unlabeled_set, to_label_set = normalization_and_select_dataset(
@@ -376,6 +371,9 @@ def normalization_and_select_dataset(
     uc_list = np.array(uc_list)
     criterion_UC = np.max(uc_list, axis=1)
     sorted_indices = np.argsort(criterion_UC)[::-1]
+    criterion_UC_sorted = np.sort(criterion_UC)[::-1]
+    for img, uc in zip(sorted_indices[:acquisition_budget], criterion_UC_sorted[:acquisition_budget]):
+        print(f"Img: {img}, uc_score: {uc}")
     to_label_set = list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     labeled_set += list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     unlabeled_set = list(np.array(unlabeled_set)[sorted_indices[acquisition_budget:]])
