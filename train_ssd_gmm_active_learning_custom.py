@@ -8,6 +8,7 @@
 
 
 from data import *
+from data.voc_picam import *
 from utils.augmentations import SSDAugmentation
 from layers.modules import MultiBoxLoss_GMM
 from ssd_gmm import build_ssd_gmm
@@ -30,7 +31,6 @@ import random
 from torch.utils.data.sampler import SubsetRandomSampler, SequentialSampler
 from subset_sequential_sampler import SubsetSequentialSampler
 
-
 random.seed(314)  # need to change manually
 torch.manual_seed(314)  # need to change manually
 
@@ -46,12 +46,15 @@ train_set = parser.add_mutually_exclusive_group()
 parser.add_argument(
     "--dataset",
     default="VOC",
-    choices=["VOC", "VOC_custom", "COCO"],
+    choices=["VOC", "VOC_custom", "COCO", "VOC_picam"],
     type=str,
     help="VOC or COCO",
 )
 parser.add_argument(
     "--voc_root", default=VOC_ROOT, help="VOC dataset root directory path"
+)
+parser.add_argument(
+    "--voc_picam_root", default=VOC_PICAM_ROOT, help="VOC dataset root directory path"
 )
 parser.add_argument(
     "--coco_root", default=COCO_ROOT, help="COCO dataset root directory path"
@@ -117,10 +120,10 @@ if args.dataset == "VOC":
     cfg = voc300_active
 elif args.dataset == "VOC_custom":
     cfg = voc300_active_custom
+elif args.dataset == "VOC_picam":
+    cfg = voc_picam_active
 else:
     cfg = coco300_active
-# TEMPORARY
-cfg["max_iter"] = 1200
 
 if torch.cuda.is_available():
     if args.cuda:
@@ -141,11 +144,18 @@ if not os.path.exists(args.eval_save_folder):
 
 
 def create_loaders():
+    # num_train_images = cfg["num_total_images"]
+    # indices = list(range(num_train_images))
+    # random.shuffle(indices)
+    # labeled_set = indices[: cfg["num_initial_labeled_set"]]
+    # unlabeled_set = indices[cfg["num_initial_labeled_set"] :]
     num_train_images = cfg["num_total_images"]
+    num_init_labeled = cfg["num_initial_labeled_set"]
     indices = list(range(num_train_images))
-    random.shuffle(indices)
-    labeled_set = indices[: cfg["num_initial_labeled_set"]]
-    unlabeled_set = indices[cfg["num_initial_labeled_set"] :]
+    labeled_set = list(range(num_init_labeled))
+    unlabeled_set = list(range(num_train_images - num_init_labeled))
+    random.shuffle(labeled_set)
+    random.shuffle(unlabeled_set)
 
     if cfg["name"] == "VOC":
         supervised_dataset = VOCDetection(
@@ -154,6 +164,16 @@ def create_loaders():
         unsupervised_dataset = VOCDetection(
             args.voc_root,
             [("2007", "trainval")],
+            BaseTransform(300, MEANS),
+            VOCAnnotationTransform(),
+        )
+    if cfg["name"] == "VOC_picam":
+        supervised_dataset = VOCPicamDetection(
+            root=args.voc_picam_root, transform=SSDAugmentation(cfg["min_dim"], MEANS)
+        )
+        unsupervised_dataset = VOCPicamDetection(
+            args.voc_picam_root,
+            ["unlabeled"],
             BaseTransform(300, MEANS),
             VOCAnnotationTransform(),
         )
@@ -382,7 +402,7 @@ def main():
         cfg["num_classes"], 0.5, True, 0, True, 3, 0.5, False, args.cuda
     )
     print(f"Labelled: {len(labeled_set)}, Unlabelled: {len(unlabeled_set)}")
-    # net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
+    net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
 
     # # active learning loop
     if cfg["name"] == "VOC":
@@ -398,18 +418,18 @@ def main():
             + str(max_iter)
             + ".pth"
         )
-        # Eval on test set
-        net = build_ssd_gmm("test", cfg["min_dim"], cfg["num_classes"])
-        net = nn.DataParallel(net)
-        print("loading trained weight {}...".format(weight_name))
-        net.load_state_dict(torch.load(weight_name))
-        net.eval()
-        test_dataset = VOCDetection(
-            args.voc_root,
-            [("2007", "test")],
-            BaseTransform(300, MEANS),
-            VOCAnnotationTransform(),
-        )
+        # # Eval on test set
+        # net = build_ssd_gmm("test", cfg["min_dim"], cfg["num_classes"])
+        # net = nn.DataParallel(net)
+        # print("loading trained weight {}...".format(weight_name))
+        # net.load_state_dict(torch.load(weight_name))
+        # net.eval()
+        # test_dataset = VOCDetection(
+        #     args.voc_root,
+        #     [("2007", "test")],
+        #     BaseTransform(300, MEANS),
+        #     VOCAnnotationTransform(),
+        # )
         # mean_ap = test_net(
         #     args.eval_save_folder,
         #     net,
@@ -477,14 +497,6 @@ def main():
             f.write(str(to_label_set[i]))
             f.write("\n")
         f.close()
-
-        # # change the loaders
-        # supervised_data_loader, unsupervised_data_loader = change_loaders(
-        #     supervised_dataset, unsupervised_dataset, labeled_set, unlabeled_set
-        # )
-        # args.resume = None
-        # args.start_iter = 0
-        # net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
 
 
 if __name__ == "__main__":
