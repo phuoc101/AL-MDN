@@ -402,10 +402,10 @@ def main():
         cfg["num_classes"], 0.5, True, 0, True, 3, 0.5, False, args.cuda
     )
     print(f"Labelled: {len(labeled_set)}, Unlabelled: {len(unlabeled_set)}")
-    net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
+    # net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
 
     # # active learning loop
-    if cfg["name"] == "VOC":
+    if "VOC" in cfg["name"]:
         max_iter = cfg["max_iter"]
         weight_name = str(
             "weights/ssd300_AL_"
@@ -459,8 +459,6 @@ def main():
             acquisition_budget=cfg["acquisition_budget"],
             num_total_images=cfg["num_total_images"],
         )
-        # print(f"New Labelled Set: {labeled_set}")
-        # print(f"New Unlabelled Set: {unlabeled_set}")
         print(
             f"New Labelled: {len(labeled_set)}, ",
             f"Unlabelled: {len(unlabeled_set)}, ",
@@ -494,8 +492,16 @@ def main():
             "w",
         )
         for i in range(len(to_label_set)):
-            f.write(str(to_label_set[i]))
-            f.write("\n")
+            img_path = str(
+                os.path.abspath(
+                    os.path.join(
+                        unsupervised_dataset.ids[int(to_label_set[i])][0],
+                        "Images",
+                        unsupervised_dataset.ids[int(to_label_set[i])][1] + ".png",
+                    )
+                )
+            )
+            f.write(f"{img_path}\n")
         f.close()
 
 

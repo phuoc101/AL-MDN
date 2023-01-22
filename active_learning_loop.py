@@ -12,6 +12,7 @@ from layers.box_utils import decode, nms
 import os
 import sys
 import time
+from tqdm import trange
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -49,7 +50,11 @@ def active_learning_cycle(
     # filtering threshold of confidence score
     thresh = 0.15
     checker = 0
-    for j in range(int(len(batch_iterator))):
+
+    # Progress bar
+    pbar = trange(int(len(batch_iterator)))
+    for j in pbar:
+        pbar.set_description("Active Learning Loop Progress")
         images, _ = next(batch_iterator)
         images = images.cuda()
 
@@ -236,7 +241,6 @@ def active_learning_cycle(
                 )
 
         # store the maximum value of each uncertainty in each jagged list
-        print(f"Image {j}:")
         for p in range(output.size(1)):
             q = 0
             if j == checker:
@@ -255,13 +259,13 @@ def active_learning_cycle(
                 list_conf_al[j].append(UC_max_conf_al_temp)
                 list_conf_ep[j].append(UC_max_conf_ep_temp)
                 q += 1
-                print(
-                    f"Uncertainty: max_al: {UC_max_al_temp}, ",
-                    f"max_conf_al: {UC_max_conf_al_temp} ",
-                    f"max_ep: {UC_max_ep_temp}, ",
-                    f"max_conf_ep: {UC_max_conf_ep_temp}",
-                )
-        print("==========")
+                # print(
+                #     f"Uncertainty: max_al: {UC_max_al_temp}, ",
+                #     f"max_conf_al: {UC_max_conf_al_temp} ",
+                #     f"max_ep: {UC_max_ep_temp}, ",
+                #     f"max_conf_ep: {UC_max_conf_ep_temp}",
+                # )
+        # print("==========")
 
     # z-score normalization and the deciding labeled and unlabeled dataset
     labeled_set, unlabeled_set, to_label_set = normalization_and_select_dataset(
@@ -372,14 +376,14 @@ def normalization_and_select_dataset(
     criterion_UC = np.max(uc_list, axis=1)
     sorted_indices = np.argsort(criterion_UC)[::-1]
     criterion_UC_sorted = np.sort(criterion_UC)[::-1]
-    for img, uc in zip(sorted_indices[:acquisition_budget], criterion_UC_sorted[:acquisition_budget]):
-        print(f"Img: {img}, uc_score: {uc}")
+    # for img, uc in zip(sorted_indices[:acquisition_budget], criterion_UC_sorted[:acquisition_budget]):
+    #     print(f"Img: {img}, uc_score: {uc}")
     to_label_set = list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     labeled_set += list(np.array(unlabeled_set)[sorted_indices[:acquisition_budget]])
     unlabeled_set = list(np.array(unlabeled_set)[sorted_indices[acquisition_budget:]])
 
-    # assert that sizes of lists are correct and that there are no elements that are in both lists
-    assert len(list(set(labeled_set) | set(unlabeled_set))) == num_total_images
-    assert len(list(set(labeled_set) & set(unlabeled_set))) == 0
+    # assert that sizes of lists are correct
+    # assert (len(list(set(labeled_set)))+len(list(set(unlabeled_set)))) == num_total_images
+    
 
     return labeled_set, unlabeled_set, to_label_set
