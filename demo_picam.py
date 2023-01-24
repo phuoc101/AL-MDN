@@ -9,7 +9,7 @@ module_path = os.path.abspath(os.path.join(".."))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from tqdm import trange
+from alive_progress import alive_bar
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -62,56 +62,59 @@ testset = VOCPicamDetection(
 )
 
 os.makedirs(args.out_dir, exist_ok=True)
-for img_id in trange(320):
-    image = testset.pull_image(img_id)
-    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # View the sampled input image before transform
-    plt.figure(figsize=(10, 10))
-    plt.imshow(rgb_image.astype(np.uint8))
+with alive_bar(320, title=f'Predicting') as bar:
+    for img_id in range(320):
+        image = testset.pull_image(img_id)
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # View the sampled input image before transform
+        plt.figure(figsize=(10, 10))
+        plt.imshow(rgb_image.astype(np.uint8))
 
-    x = cv2.resize(image, (300, 300)).astype(np.float32)
-    x -= (104.0, 117.0, 123.0)
-    x = x.astype(np.float32)
-    x = x[:, :, ::-1].copy()
-    plt.imshow(x.astype(np.uint8))
-    x = torch.from_numpy(x).permute(2, 0, 1)
+        x = cv2.resize(image, (300, 300)).astype(np.float32)
+        x -= (104.0, 117.0, 123.0)
+        x = x.astype(np.float32)
+        x = x[:, :, ::-1].copy()
+        plt.imshow(x.astype(np.uint8))
+        x = torch.from_numpy(x).permute(2, 0, 1)
 
-    # wrap tensor in Variable
-    xx = Variable(x.unsqueeze(0))
-    if torch.cuda.is_available():
-        xx = xx.cuda()
-    y = net(xx)
+        # wrap tensor in Variable
+        xx = Variable(x.unsqueeze(0))
+        if torch.cuda.is_available():
+            xx = xx.cuda()
+        y = net(xx)
 
-    top_k = 10
-    plt.figure(figsize=(10, 10))
-    if args.dataset == "VOC":
-        colors = plt.cm.hsv(np.linspace(0, 1, 21)).tolist()
-    else:
-        colors = plt.cm.hsv(np.linspace(0, 1, 81)).tolist()
-    plt.imshow(rgb_image.astype(np.uint8))  # plot the image for matplotlib
-    currentAxis = plt.gca()
+        top_k = 10
+        plt.figure(figsize=(10, 10))
+        if args.dataset == "VOC":
+            colors = plt.cm.hsv(np.linspace(0, 1, 21)).tolist()
+        else:
+            colors = plt.cm.hsv(np.linspace(0, 1, 81)).tolist()
+        plt.imshow(rgb_image.astype(np.uint8))  # plot the image for matplotlib
+        currentAxis = plt.gca()
 
-    detections = y.data
-    # scale each detection back up to the image
-    scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
-    for i in range(detections.size(1)):
-        j = 0
-        while detections[0, i, j, 0] >= 0.5:
-            score = detections[0, i, j, 0]
-            label_name = VOC_PICAM_CLASSES[i - 1]
-            display_txt = "%s: %.2f" % (label_name, score)
-            pt = (detections[0, i, j, 1:5] * scale).cpu().numpy()
-            coords = (pt[0], pt[1]), pt[2] - pt[0] + 1, pt[3] - pt[1] + 1
-            # print(score)
-            # print(pt[0], pt[1], pt[2], pt[3])
-            # print("----")
-            color = colors[i]
-            currentAxis.add_patch(
-                plt.Rectangle(*coords, fill=False, edgecolor=color, linewidth=2)
-            )
-            currentAxis.text(
-                pt[0], pt[1], display_txt, bbox={"facecolor": color, "alpha": 0.5}
-            )
-            j += 1
-    filename = testset.ids[img_id][1]
-    plt.savefig("{}/{}.png".format(args.out_dir, filename))
+        detections = y.data
+        # scale each detection back up to the image
+        scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
+        for i in range(detections.size(1)):
+            j = 0
+            while detections[0, i, j, 0] >= 0.5:
+                score = detections[0, i, j, 0]
+                label_name = VOC_PICAM_CLASSES[i - 1]
+                display_txt = "%s: %.2f" % (label_name, score)
+                pt = (detections[0, i, j, 1:5] * scale).cpu().numpy()
+                coords = (pt[0], pt[1]), pt[2] - pt[0] + 1, pt[3] - pt[1] + 1
+                # print(score)
+                # print(pt[0], pt[1], pt[2], pt[3])
+                # print("----")
+                color = colors[i]
+                currentAxis.add_patch(
+                    plt.Rectangle(*coords, fill=False, edgecolor=color, linewidth=2)
+                )
+                currentAxis.text(
+                    pt[0], pt[1], display_txt, bbox={"facecolor": color, "alpha": 0.5}
+                )
+                j += 1
+        filename = testset.ids[img_id][1]
+        plt.savefig("{}/{}.png".format(args.out_dir, filename))
+        plt.close()
+        bar()

@@ -12,7 +12,7 @@ from layers.box_utils import decode, nms
 import os
 import sys
 import time
-from tqdm import trange
+from alive_progress import alive_bar
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -52,220 +52,220 @@ def active_learning_cycle(
     checker = 0
 
     # Progress bar
-    pbar = trange(int(len(batch_iterator)))
-    for j in pbar:
-        pbar.set_description("Active Learning Loop Progress")
-        images, _ = next(batch_iterator)
-        images = images.cuda()
+    with alive_bar(int(len(batch_iterator)), ctrl_c=False, title=f'Active Learning Loop Progress') as bar:
+        for j in range(int(len(batch_iterator))):
+            images, _ = next(batch_iterator)
+            images = images.cuda()
 
-        out = net(images)
-        (
-            priors,
-            loc,
-            loc_var,
-            loc_pi,
-            loc_2,
-            loc_var_2,
-            loc_pi_2,
-            loc_3,
-            loc_var_3,
-            loc_pi_3,
-            loc_4,
-            loc_var_4,
-            loc_pi_4,
-            conf,
-            conf_var,
-            conf_pi,
-            conf_2,
-            conf_var_2,
-            conf_pi_2,
-            conf_3,
-            conf_var_3,
-            conf_pi_3,
-            conf_4,
-            conf_var_4,
-            conf_pi_4,
-        ) = out
+            out = net(images)
+            (
+                priors,
+                loc,
+                loc_var,
+                loc_pi,
+                loc_2,
+                loc_var_2,
+                loc_pi_2,
+                loc_3,
+                loc_var_3,
+                loc_pi_3,
+                loc_4,
+                loc_var_4,
+                loc_pi_4,
+                conf,
+                conf_var,
+                conf_pi,
+                conf_2,
+                conf_var_2,
+                conf_pi_2,
+                conf_3,
+                conf_var_3,
+                conf_pi_3,
+                conf_4,
+                conf_var_4,
+                conf_pi_4,
+            ) = out
 
-        # confidence score of classification
-        # use a softmax function to make valus in probability space
-        conf = torch.softmax(conf, dim=2)
-        conf_2 = torch.softmax(conf_2, dim=2)
-        conf_3 = torch.softmax(conf_3, dim=2)
-        conf_4 = torch.softmax(conf_4, dim=2)
+            # confidence score of classification
+            # use a softmax function to make valus in probability space
+            conf = torch.softmax(conf, dim=2)
+            conf_2 = torch.softmax(conf_2, dim=2)
+            conf_3 = torch.softmax(conf_3, dim=2)
+            conf_4 = torch.softmax(conf_4, dim=2)
 
-        # mixture weight of classification
-        conf_p_pi = conf_pi.view(-1, 1)
-        conf_p_2_pi = conf_pi_2.view(-1, 1)
-        conf_p_3_pi = conf_pi_3.view(-1, 1)
-        conf_p_4_pi = conf_pi_4.view(-1, 1)
+            # mixture weight of classification
+            conf_p_pi = conf_pi.view(-1, 1)
+            conf_p_2_pi = conf_pi_2.view(-1, 1)
+            conf_p_3_pi = conf_pi_3.view(-1, 1)
+            conf_p_4_pi = conf_pi_4.view(-1, 1)
 
-        conf_var = torch.sigmoid(conf_var)
-        conf_var_2 = torch.sigmoid(conf_var_2)
-        conf_var_3 = torch.sigmoid(conf_var_3)
-        conf_var_4 = torch.sigmoid(conf_var_4)
+            conf_var = torch.sigmoid(conf_var)
+            conf_var_2 = torch.sigmoid(conf_var_2)
+            conf_var_3 = torch.sigmoid(conf_var_3)
+            conf_var_4 = torch.sigmoid(conf_var_4)
 
-        # use a softmax function to keep pi in probability space and split mixture weights
-        (conf_pi, conf_pi_2, conf_pi_3, conf_pi_4) = stack_softamx_unbind(
-            pi=conf_p_pi,
-            pi_2=conf_p_2_pi,
-            pi_3=conf_p_3_pi,
-            pi_4=conf_p_4_pi,
-        )
-        conf_pi = conf_pi.view(conf.size(0), -1, 1)
-        conf_pi_2 = conf_pi_2.view(conf.size(0), -1, 1)
-        conf_pi_3 = conf_pi_3.view(conf.size(0), -1, 1)
-        conf_pi_4 = conf_pi_4.view(conf.size(0), -1, 1)
+            # use a softmax function to keep pi in probability space and split mixture weights
+            (conf_pi, conf_pi_2, conf_pi_3, conf_pi_4) = stack_softamx_unbind(
+                pi=conf_p_pi,
+                pi_2=conf_p_2_pi,
+                pi_3=conf_p_3_pi,
+                pi_4=conf_p_4_pi,
+            )
+            conf_pi = conf_pi.view(conf.size(0), -1, 1)
+            conf_pi_2 = conf_pi_2.view(conf.size(0), -1, 1)
+            conf_pi_3 = conf_pi_3.view(conf.size(0), -1, 1)
+            conf_pi_4 = conf_pi_4.view(conf.size(0), -1, 1)
 
-        # classification score
-        new_conf = (
-            conf_pi * conf
-            + conf_pi_2 * conf_2
-            + conf_pi_3 * conf_3
-            + conf_pi_4 * conf_4
-        )
+            # classification score
+            new_conf = (
+                conf_pi * conf
+                + conf_pi_2 * conf_2
+                + conf_pi_3 * conf_3
+                + conf_pi_4 * conf_4
+            )
 
-        # aleatoric uncertainty of classification
-        cls_al_uc = (
-            conf_pi * conf_var
-            + conf_pi_2 * conf_var_2
-            + conf_pi_3 * conf_var_3
-            + conf_pi_4 * conf_var_4
-        )
+            # aleatoric uncertainty of classification
+            cls_al_uc = (
+                conf_pi * conf_var
+                + conf_pi_2 * conf_var_2
+                + conf_pi_3 * conf_var_3
+                + conf_pi_4 * conf_var_4
+            )
 
-        # epistemic uncertainty of classification
-        cls_ep_uc = (
-            conf_pi * (conf - new_conf) ** 2
-            + conf_pi_2 * (conf_2 - new_conf) ** 2
-            + conf_pi_3 * (conf_3 - new_conf) ** 2
-            + conf_pi_4 * (conf_4 - new_conf) ** 2
-        )
-        new_conf = new_conf.view(loc.size(0), priors.size(0), num_classes).transpose(
-            2, 1
-        )
-        cls_al_uc = cls_al_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
-            2, 1
-        )
-        cls_ep_uc = cls_ep_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
-            2, 1
-        )
+            # epistemic uncertainty of classification
+            cls_ep_uc = (
+                conf_pi * (conf - new_conf) ** 2
+                + conf_pi_2 * (conf_2 - new_conf) ** 2
+                + conf_pi_3 * (conf_3 - new_conf) ** 2
+                + conf_pi_4 * (conf_4 - new_conf) ** 2
+            )
+            new_conf = new_conf.view(loc.size(0), priors.size(0), num_classes).transpose(
+                2, 1
+            )
+            cls_al_uc = cls_al_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
+                2, 1
+            )
+            cls_ep_uc = cls_ep_uc.view(loc.size(0), priors.size(0), num_classes).transpose(
+                2, 1
+            )
 
-        # aleatoric uncertainty of localizaiton
-        # use a sigmoid function to satisfy the positiveness constraint
-        loc_var = torch.sigmoid(loc_var)
-        loc_var_2 = torch.sigmoid(loc_var_2)
-        loc_var_3 = torch.sigmoid(loc_var_3)
-        loc_var_4 = torch.sigmoid(loc_var_4)
+            # aleatoric uncertainty of localizaiton
+            # use a sigmoid function to satisfy the positiveness constraint
+            loc_var = torch.sigmoid(loc_var)
+            loc_var_2 = torch.sigmoid(loc_var_2)
+            loc_var_3 = torch.sigmoid(loc_var_3)
+            loc_var_4 = torch.sigmoid(loc_var_4)
 
-        # mixture weight of localizaiton
-        loc_p_pi = loc_pi.view(-1, 4)
-        loc_p_2_pi = loc_pi_2.view(-1, 4)
-        loc_p_3_pi = loc_pi_3.view(-1, 4)
-        loc_p_4_pi = loc_pi_4.view(-1, 4)
+            # mixture weight of localizaiton
+            loc_p_pi = loc_pi.view(-1, 4)
+            loc_p_2_pi = loc_pi_2.view(-1, 4)
+            loc_p_3_pi = loc_pi_3.view(-1, 4)
+            loc_p_4_pi = loc_pi_4.view(-1, 4)
 
-        # use a softmax function to keep pi in probability space and split mixture weights
-        (pi_1_after, pi_2_after, pi_3_after, pi_4_after) = stack_softamx_unbind(
-            pi=loc_p_pi,
-            pi_2=loc_p_2_pi,
-            pi_3=loc_p_3_pi,
-            pi_4=loc_p_4_pi,
-        )
+            # use a softmax function to keep pi in probability space and split mixture weights
+            (pi_1_after, pi_2_after, pi_3_after, pi_4_after) = stack_softamx_unbind(
+                pi=loc_p_pi,
+                pi_2=loc_p_2_pi,
+                pi_3=loc_p_3_pi,
+                pi_4=loc_p_4_pi,
+            )
 
-        pi_1_after = pi_1_after.view(loc.size(0), -1, 4)
-        pi_2_after = pi_2_after.view(loc.size(0), -1, 4)
-        pi_3_after = pi_3_after.view(loc.size(0), -1, 4)
-        pi_4_after = pi_4_after.view(loc.size(0), -1, 4)
+            pi_1_after = pi_1_after.view(loc.size(0), -1, 4)
+            pi_2_after = pi_2_after.view(loc.size(0), -1, 4)
+            pi_3_after = pi_3_after.view(loc.size(0), -1, 4)
+            pi_4_after = pi_4_after.view(loc.size(0), -1, 4)
 
-        # localization coordinates
-        new_loc = (
-            pi_1_after * loc
-            + pi_2_after * loc_2
-            + pi_3_after * loc_3
-            + pi_4_after * loc_4
-        )
+            # localization coordinates
+            new_loc = (
+                pi_1_after * loc
+                + pi_2_after * loc_2
+                + pi_3_after * loc_3
+                + pi_4_after * loc_4
+            )
 
-        # aleatoric uncertainty of localization
-        al_uc = (
-            pi_1_after * loc_var
-            + pi_2_after * loc_var_2
-            + pi_3_after * loc_var_3
-            + pi_4_after * loc_var_4
-        )
+            # aleatoric uncertainty of localization
+            al_uc = (
+                pi_1_after * loc_var
+                + pi_2_after * loc_var_2
+                + pi_3_after * loc_var_3
+                + pi_4_after * loc_var_4
+            )
 
-        # epistemic uncertainty of localization
-        ep_uc = (
-            pi_1_after * (loc - new_loc) ** 2
-            + pi_2_after * (loc_2 - new_loc) ** 2
-            + pi_3_after * (loc_3 - new_loc) ** 2
-            + pi_4_after * (loc_4 - new_loc) ** 2
-        )
+            # epistemic uncertainty of localization
+            ep_uc = (
+                pi_1_after * (loc - new_loc) ** 2
+                + pi_2_after * (loc_2 - new_loc) ** 2
+                + pi_3_after * (loc_3 - new_loc) ** 2
+                + pi_4_after * (loc_4 - new_loc) ** 2
+            )
 
-        num = loc.size(0)
-        output = torch.zeros(num, num_classes, 200, 15)
-        variance = [0.1, 0.2]
-        for i in range(num):
-            decoded_boxes = decode(new_loc[i], priors, variance)
-            conf_scores = new_conf[i]
-            loc_al_uc_clone = al_uc[i]
-            loc_ep_uc_clone = ep_uc[i]
-            conf_al_clone = cls_al_uc[i]
-            conf_ep_clone = cls_ep_uc[i]
+            num = loc.size(0)
+            output = torch.zeros(num, num_classes, 200, 15)
+            variance = [0.1, 0.2]
+            for i in range(num):
+                decoded_boxes = decode(new_loc[i], priors, variance)
+                conf_scores = new_conf[i]
+                loc_al_uc_clone = al_uc[i]
+                loc_ep_uc_clone = ep_uc[i]
+                conf_al_clone = cls_al_uc[i]
+                conf_ep_clone = cls_ep_uc[i]
 
-            for cl in range(1, num_classes):
-                c_mask = conf_scores[cl].gt(0.01)
-                # confidence score
-                scores = conf_scores[cl][c_mask]
-                # aleatoric and epistemic uncertainties of classification
-                conf_al = conf_al_clone[cl][c_mask]
-                conf_ep = conf_ep_clone[cl][c_mask]
-                if scores.size(0) == 0:
-                    continue
+                for cl in range(1, num_classes):
+                    c_mask = conf_scores[cl].gt(0.01)
+                    # confidence score
+                    scores = conf_scores[cl][c_mask]
+                    # aleatoric and epistemic uncertainties of classification
+                    conf_al = conf_al_clone[cl][c_mask]
+                    conf_ep = conf_ep_clone[cl][c_mask]
+                    if scores.size(0) == 0:
+                        continue
 
-                l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes)
-                boxes = decoded_boxes[l_mask].view(-1, 4)
-                # aleatoric and epistemic uncertainties of localization
-                loc_al_uc = loc_al_uc_clone[l_mask].view(-1, 4)
-                loc_ep_uc = loc_ep_uc_clone[l_mask].view(-1, 4)
+                    l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes)
+                    boxes = decoded_boxes[l_mask].view(-1, 4)
+                    # aleatoric and epistemic uncertainties of localization
+                    loc_al_uc = loc_al_uc_clone[l_mask].view(-1, 4)
+                    loc_ep_uc = loc_ep_uc_clone[l_mask].view(-1, 4)
 
-                ids, count = nms(boxes.detach(), scores.detach(), 0.45, 200)
-                output[i, cl, :count] = torch.cat(
-                    (
-                        scores[ids[:count]].unsqueeze(1),
-                        boxes[ids[:count]],
-                        loc_al_uc[ids[:count]],
-                        loc_ep_uc[ids[:count]],
-                        conf_al[ids[:count]].unsqueeze(1),
-                        conf_ep[ids[:count]].unsqueeze(1),
-                    ),
-                    1,
-                )
+                    ids, count = nms(boxes.detach(), scores.detach(), 0.45, 200)
+                    output[i, cl, :count] = torch.cat(
+                        (
+                            scores[ids[:count]].unsqueeze(1),
+                            boxes[ids[:count]],
+                            loc_al_uc[ids[:count]],
+                            loc_ep_uc[ids[:count]],
+                            conf_al[ids[:count]].unsqueeze(1),
+                            conf_ep[ids[:count]].unsqueeze(1),
+                        ),
+                        1,
+                    )
 
-        # store the maximum value of each uncertainty in each jagged list
-        for p in range(output.size(1)):
-            q = 0
-            if j == checker:
-                list_loc_al.append([])
-                list_loc_ep.append([])
-                list_conf_al.append([])
-                list_conf_ep.append([])
-                checker = j + 1
-            while output[0, p, q, 0] >= thresh:
-                UC_max_al_temp = torch.max(output[0, p, q, 5:9]).item()
-                UC_max_ep_temp = torch.max(output[0, p, q, 9:13]).item()
-                UC_max_conf_al_temp = torch.max(output[0, p, q, 13:14]).item()
-                UC_max_conf_ep_temp = torch.max(output[0, p, q, 14:15]).item()
-                list_loc_al[j].append(UC_max_al_temp)
-                list_loc_ep[j].append(UC_max_ep_temp)
-                list_conf_al[j].append(UC_max_conf_al_temp)
-                list_conf_ep[j].append(UC_max_conf_ep_temp)
-                q += 1
-                # print(
-                #     f"Uncertainty: max_al: {UC_max_al_temp}, ",
-                #     f"max_conf_al: {UC_max_conf_al_temp} ",
-                #     f"max_ep: {UC_max_ep_temp}, ",
-                #     f"max_conf_ep: {UC_max_conf_ep_temp}",
-                # )
-        # print("==========")
+            # store the maximum value of each uncertainty in each jagged list
+            for p in range(output.size(1)):
+                q = 0
+                if j == checker:
+                    list_loc_al.append([])
+                    list_loc_ep.append([])
+                    list_conf_al.append([])
+                    list_conf_ep.append([])
+                    checker = j + 1
+                while output[0, p, q, 0] >= thresh:
+                    UC_max_al_temp = torch.max(output[0, p, q, 5:9]).item()
+                    UC_max_ep_temp = torch.max(output[0, p, q, 9:13]).item()
+                    UC_max_conf_al_temp = torch.max(output[0, p, q, 13:14]).item()
+                    UC_max_conf_ep_temp = torch.max(output[0, p, q, 14:15]).item()
+                    list_loc_al[j].append(UC_max_al_temp)
+                    list_loc_ep[j].append(UC_max_ep_temp)
+                    list_conf_al[j].append(UC_max_conf_al_temp)
+                    list_conf_ep[j].append(UC_max_conf_ep_temp)
+                    q += 1
+                    # print(
+                    #     f"Uncertainty: max_al: {UC_max_al_temp}, ",
+                    #     f"max_conf_al: {UC_max_conf_al_temp} ",
+                    #     f"max_ep: {UC_max_ep_temp}, ",
+                    #     f"max_conf_ep: {UC_max_conf_ep_temp}",
+                    # )
+            # print("==========")
+            bar()
 
     # z-score normalization and the deciding labeled and unlabeled dataset
     labeled_set, unlabeled_set, to_label_set = normalization_and_select_dataset(

@@ -128,3 +128,4 @@ dmypy.json
 *.pth
 *.pkl
 *label*.txt
+*out_batch*
