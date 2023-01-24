@@ -169,13 +169,16 @@ def create_loaders():
         )
     if cfg["name"] == "VOC_picam":
         supervised_dataset = VOCPicamDetection(
-            root=args.voc_picam_root, transform=SSDAugmentation(cfg["min_dim"], MEANS)
+            args.voc_picam_root,
+            ["train"],
+            SSDAugmentation(cfg["min_dim"], MEANS),
+            VOCPicamAnnotationTransform(),
         )
         unsupervised_dataset = VOCPicamDetection(
             args.voc_picam_root,
             ["unlabeled"],
             BaseTransform(300, MEANS),
-            VOCAnnotationTransform(),
+            VOCPicamAnnotationTransform(),
         )
     else:
         supervised_dataset = COCODetection(
@@ -402,7 +405,7 @@ def main():
         cfg["num_classes"], 0.5, True, 0, True, 3, 0.5, False, args.cuda
     )
     print(f"Labelled: {len(labeled_set)}, Unlabelled: {len(unlabeled_set)}")
-    # net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
+    net = train(labeled_set, supervised_data_loader, indices, cfg, criterion)
 
     # # active learning loop
     if "VOC" in cfg["name"]:

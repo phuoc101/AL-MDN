@@ -63,7 +63,7 @@ class VOCPicamAnnotationTransform(object):
             pts = ["xmin", "ymin", "xmax", "ymax"]
             bndbox = []
             for i, pt in enumerate(pts):
-                cur_pt = float(bbox.find(pt).text) - 1
+                cur_pt = int(float(bbox.find(pt).text)) - 1
                 # scale height or width
                 cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
                 bndbox.append(cur_pt)
@@ -123,7 +123,7 @@ class VOCPicamDetection(data.Dataset):
         img_id = self.ids[index]
 
         # Check if annotation file exists
-        if osp.isfile(self._annopath):
+        if osp.isfile(self._annopath % img_id):
             target = ET.parse(self._annopath % img_id).getroot()
         else:
             dummy_anno = osp.join(
